@@ -300,7 +300,7 @@ public class KThread {
 			joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);
 			joinQueue.acquire(this);
 		}
-		else if (currentThread != this && status != statusFinished) {
+		if (currentThread != this && status != statusFinished) {
 			joinQueue.waitForAccess(currentThread);
 			currentThread.sleep();
 		}
