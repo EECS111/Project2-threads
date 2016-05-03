@@ -1,7 +1,9 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.*;
 
+import org.omg.CORBA.Current;
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
  * until a certain time.
@@ -15,6 +17,7 @@ public class Alarm {
 	 * <b>Note</b>: Nachos will not function correctly with more than one alarm.
 	 */
 	public Alarm() {
+		waitQueue = new ArrayList<waitNode>();
 		Machine.timer().setInterruptHandler(new Runnable() {
 			public void run() {
 				timerInterrupt();
@@ -29,6 +32,16 @@ public class Alarm {
 	 * should be run.
 	 */
 	public void timerInterrupt() {
+		boolean intStatus = Machine.interrupt().disable();
+		ListIterator<waitNode> itr = waitQueue.listIterator();
+		while(itr.hasNext()){
+			waitNode curr = itr.next();
+			if(curr.wakeTime <= Machine.timer().getTime()){
+				curr.thread.ready();
+				itr.remove();
+			}
+		}
+		Machine.interrupt().restore(intStatus);
 		KThread.currentThread().yield();
 	}
 
@@ -46,8 +59,21 @@ public class Alarm {
 	 */
 	public void waitUntil(long x) {
 		// for now, cheat just to get something working (busy waiting is bad)
+		boolean intStatus = Machine.interrupt().disable(); 
 		long wakeTime = Machine.timer().getTime() + x;
-		while (wakeTime > Machine.timer().getTime())
-			KThread.yield();
+		waitQueue.add(new waitNode(KThread.currentThread(), wakeTime));
+		KThread.sleep();
+		Machine.interrupt().restore(intStatus);
+		
+	
 	}
+	private static class waitNode{
+		KThread thread;
+		long wakeTime;
+		private waitNode(KThread thread, long waketime){
+			this.thread = thread;
+			this.wakeTime = waketime;
+		}
+	}
+	private List<waitNode> waitQueue;
 }
