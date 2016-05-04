@@ -1,6 +1,7 @@
 package nachos.threads;
 
 import nachos.machine.*;
+
 import java.util.*;
 
 /**
@@ -15,12 +16,13 @@ public class Communicator {
 	 * Allocate a new communicator.
 	 */
 	public Communicator() {
-		ComLock = new Lock();
-		sCond = new Condition(ComLock);
-		lCond = new Condition(ComLock);
-		sCount = 0;
-		lCount = 0;
-		wordReady = false;
+		lock = new Lock();
+		speakerWaitingQ = new Condition(lock);
+		speakerSending = new Condition(lock);
+		listenerWaitingQ = new Condition(lock);
+		listenerReceiving = new Condition(lock);
+		
+		listenerWaiting = speakerWaiting = received = false;
 	}
 
 	/**
@@ -34,16 +36,33 @@ public class Communicator {
 	 * @param word the integer to transfer.
 	 */
 	public void speak(int word) {
-		ComLock.acquire();
-		sCount++;
-		while(lCount <= 0 || wordReady){
-			sCond.sleep();
+		
+		lock.acquire();
+		
+		//if speaker is not waiting, add to waiting queue
+		while(speakerWaiting){
+			speakerWaitingQ.sleep();
 		}
-		this.word = word;
-		wordReady = true;
-		lCond.wakeAll();
-		sCount--;
-		ComLock.release();	
+		
+		speakerWaiting = true;
+		hold = word;
+		
+		//if a listener is not waiting or a messaged is not received
+		//wake up a listener and put the speaker to a sending queue
+		while (!listenerWaiting || !received){
+			listenerReceiving.wake();
+			speakerSending.sleep();
+		}
+		
+		//set to false so listener can get into a receiving queue
+		// and speaker to sending queue
+		listenerWaiting = speakerWaiting = received = false;
+		
+		//wakes waiting speaker
+		speakerWaitingQ.wake();
+		listenerWaitingQ.wake();
+		lock.release();
+			
 	}
 
 	/**
@@ -53,26 +72,43 @@ public class Communicator {
 	 * @return the integer transferred.
 	 */
 	public int listen() {
-		ComLock.acquire();
-		lCount++;
-		while(!wordReady){
-			sCond.wakeAll();
-			lCond.sleep();
-		}
-		int W = this.word;
-		wordReady = false;
 		
-		lCount--;
-		ComLock.release();
-		return W;
+		lock.acquire();
+		while(listenerWaiting){
+			listenerWaitingQ.sleep();
+		}
+		
+		listenerWaiting = true;
+		//cannot continue unless listener Waiting is false. set by speak
+		
+		//if no speaker is waiting
+		//set receiver to be ready to receive message
+		while( !speakerWaiting ){
+			listenerReceiving.sleep();
+		}
+		
+		//passes while loop if there is a speaker sending a message
+		// and wakes speaker in sendingQueue
+		
+		speakerSending.wake();
+		received = true;
+		lock.release();
+		return hold;
 		
 	}
 	
-	private Lock ComLock;
-	private Condition sCond;
-	private long sCount;
-	private Condition lCond;
-	private long lCount;
-	private boolean wordReady;
-	private int word;
+	private Condition speakerWaitingQ; //queue for waiting speakers
+	private Condition speakerSending; //speaker sending word
+	private Condition listenerWaitingQ; //queue for waiting listeners
+	private Condition listenerReceiving; //listener recieving word
+	
+	private boolean listenerWaiting; //true if listener is waiting
+	private boolean speakerWaiting; //true if speaker is waiting
+	private boolean received; //true if message is recieved
+	
+	private int hold; //the word
+	private Lock lock;
+	
+	
+	
 }
