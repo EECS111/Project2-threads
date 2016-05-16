@@ -468,8 +468,9 @@ public class KThread {
 	private Runnable target;
 
 	private TCB tcb;
+    
 
-	/**
+    /**
 	 * Unique identifer for this thread. Used to deterministically compare
 	 * threads.
 	 */
@@ -480,7 +481,7 @@ public class KThread {
 
 	private static ThreadQueue readyQueue = null;
 	
-	private static ThreadQueue joinQueue = null;
+	private ThreadQueue joinQueue = null;
 
 	private static KThread currentThread = null;
 
@@ -488,5 +489,4 @@ public class KThread {
 
 	private static KThread idleThread = null;
 	
-	private static KThread waitQueue = null;
 }
